@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello Website - Snake Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            background-color: #e8f5e9;
+        }
+        h1 {
+            color: #333;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+        canvas {
+            border: 2px solid #333;
+            background-color: #f8f8f8;
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .controls {
+            margin-top: 15px;
+            font-size: 1rem;
+            color: #555;
+        }
+        .navigation {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+            font-size: 1.2rem;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>Snake Game</h1>
+    
+    <div class="game-container">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <div class="controls">Use arrow keys to control the snake</div>
+    </div>
+    
+    <div class="navigation">
+        <a href="index.html">Home</a>
+        <a href="about.html">About</a>
+    </div>
+
+    <script>
+        // Game variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const boxSize = 20;
+        const canvasSize = 400;
+        const fps = 10;
+        
+        let snake = [];
+        let food = {};
+        let direction = 'right';
+        let score = 0;
+        let gameRunning = true;
+        
+        // Initialize game
+        function init() {
+            // Create initial snake
+            snake = [
+                {x: 5 * boxSize, y: 10 * boxSize},
+                {x: 4 * boxSize, y: 10 * boxSize},
+                {x: 3 * boxSize, y: 10 * boxSize}
+            ];
+            
+            // Create initial food
+            createFood();
+            
+            // Start game loop
+            gameLoop = setInterval(update, 1000 / fps);
+            
+            // Add event listener for keyboard controls
+            document.addEventListener('keydown', changeDirection);
+        }
+        
+        // Create food at random position
+        function createFood() {
+            food = {
+                x: Math.floor(Math.random() * (canvasSize / boxSize)) * boxSize,
+                y: Math.floor(Math.random() * (canvasSize / boxSize)) * boxSize
+            };
+            
+            // Make sure food doesn't appear on snake
+            for (let i = 0; i < snake.length; i++) {
+                if (snake[i].x === food.x && snake[i].y === food.y) {
+                    createFood();
+                    return;
+                }
+            }
+        }
+        
+        // Handle keyboard input
+        function changeDirection(event) {
+            const key = event.keyCode;
+            
+            // Prevent reversing direction
+            if (key === 37 && direction !== 'right') direction = 'left';
+            else if (key === 38 && direction !== 'down') direction = 'up';
+            else if (key === 39 && direction !== 'left') direction = 'right';
+            else if (key === 40 && direction !== 'up') direction = 'down';
+        }
+        
+        // Update game state
+        function update() {
+            if (!gameRunning) return;
+            
+            // Create new head based on direction
+            let newHead = {
+                x: snake[0].x,
+                y: snake[0].y
+            };
+            
+            // Update head position based on direction
+            if (direction === 'right') newHead.x += boxSize;
+            else if (direction === 'left') newHead.x -= boxSize;
+            else if (direction === 'up') newHead.y -= boxSize;
+            else if (direction === 'down') newHead.y += boxSize;
+            
+            // Check for collisions
+            if (
+                newHead.x < 0 || 
+                newHead.x >= canvasSize || 
+                newHead.y < 0 || 
+                newHead.y >= canvasSize ||
+                collision(newHead, snake)
+            ) {
+                gameOver();
+                return;
+            }
+            
+            // Add new head to snake
+            snake.unshift(newHead);
+            
+            // Check if snake ate food
+            if (newHead.x === food.x && newHead.y === food.y) {
+                score++;
+                createFood();
+            } else {
+                // Remove tail if no food was eaten
+                snake.pop();
+            }
+            
+            // Draw everything
+            draw();
+        }
+        
+        // Check if head collides with snake body
+        function collision(head, array) {
+            for (let i = 1; i < array.length; i++) {
+                if (head.x === array[i].x && head.y === array[i].y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        // Game over
+        function gameOver() {
+            gameRunning = false;
+            clearInterval(gameLoop);
+            
+            // Display game over message
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvasSize, canvasSize);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '30px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Game Over!', canvasSize / 2, canvasSize / 2 - 20);
+            ctx.fillText(`Score: ${score}`, canvasSize / 2, canvasSize / 2 + 20);
+            ctx.font = '20px Arial';
+            ctx.fillText('Press Space to Restart', canvasSize / 2, canvasSize / 2 + 60);
+            
+            // Add event listener for restart
+            document.addEventListener('keydown', function restart(event) {
+                if (event.keyCode === 32) { // Space key
+                    document.removeEventListener('keydown', restart);
+                    gameRunning = true;
+                    score = 0;
+                    direction = 'right';
+                    init();
+                }
+            });
+        }
+        
+        // Draw everything
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#f8f8f8';
+            ctx.fillRect(0, 0, canvasSize, canvasSize);
+            
+            // Draw snake
+            for (let i = 0; i < snake.length; i++) {
+                ctx.fillStyle = i === 0 ? '#4CAF50' : '#8BC34A';
+                ctx.fillRect(snake[i].x, snake[i].y, boxSize, boxSize);
+                
+                ctx.strokeStyle = '#388E3C';
+                ctx.strokeRect(snake[i].x, snake[i].y, boxSize, boxSize);
+            }
+            
+            // Draw food
+            ctx.fillStyle = '#FF5722';
+            ctx.fillRect(food.x, food.y, boxSize, boxSize);
+            
+            // Draw score
+            ctx.fillStyle = '#333';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Score: ${score}`, 10, 30);
+        }
+        
+        // Start the game
+        init();
+    </script>
+</body>
+</html>
