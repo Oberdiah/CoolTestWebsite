@@ -16,11 +16,13 @@
             flex-direction: column;
             background-color: #f5f5f5;
         }
+
         h1 {
             color: #333;
             font-size: 2.5rem;
             margin-bottom: 20px;
         }
+
         .container {
             background-color: white;
             padding: 30px;
@@ -29,12 +31,14 @@
             width: 80%;
             max-width: 600px;
         }
+
         .activity-options {
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
             margin-bottom: 20px;
         }
+
         .activity-button {
             padding: 10px 15px;
             border: 2px solid #ddd;
@@ -43,16 +47,19 @@
             cursor: pointer;
             transition: all 0.3s;
         }
+
         .activity-button.selected {
             background-color: #4CAF50;
             color: white;
             border-color: #4CAF50;
         }
+
         .controls {
             display: flex;
             justify-content: space-between;
             margin-top: 20px;
         }
+
         button {
             padding: 10px 15px;
             border: none;
@@ -62,35 +69,43 @@
             cursor: pointer;
             font-size: 1rem;
         }
+
         button:hover {
             background-color: #0055aa;
         }
+
         .add-activity-container {
             margin-top: 20px;
             display: none;
         }
+
         .add-activity-container.visible {
             display: block;
         }
+
         input {
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
             width: 70%;
         }
+
         .navigation {
             margin-top: 30px;
             display: flex;
             gap: 20px;
         }
+
         a {
             color: #0066cc;
             text-decoration: none;
             font-size: 1.2rem;
         }
+
         a:hover {
             text-decoration: underline;
         }
+
         .time-history {
             margin-top: 20px;
             padding: 15px;
@@ -98,40 +113,37 @@
             border-radius: 5px;
             border: 1px solid #ddd;
         }
+
         .time-history h3 {
             margin-top: 0;
             color: #333;
         }
     </style>
-    <script src="script.js"></script>
 </head>
 <body>
     <h1>Time Tracking</h1>
-    
+
     <div class="container">
         <h2>Select an Activity</h2>
         <div class="activity-options" id="activity-options">
-            <div class="activity-button" data-activity="badminton">Badminton</div>
-            <div class="activity-button" data-activity="computer games">Computer Games</div>
-            <div class="activity-button" data-activity="eating">Eating</div>
         </div>
-        
+
         <div class="add-activity-container" id="add-activity-container">
             <input type="text" id="new-activity-input" placeholder="Enter new activity name">
             <button id="confirm-add-activity">Add</button>
         </div>
-        
+
         <div class="time-history" id="time-history">
             <h3>Time History</h3>
-            <div id="history-content">No activities tracked yet.</div>
+            <div id="history-content">Loading tracked activities...</div>
         </div>
-        
+
         <div class="controls">
             <button id="add-activity-btn">Add New Activity</button>
             <button id="download-json-btn">Download as JSON</button>
         </div>
     </div>
-    
+
     <div class="navigation">
         <a href="index.html">Home</a>
         <a href="about.html">About</a>
@@ -139,223 +151,229 @@
     </div>
 
     <script>
-        // Time tracking variables
-        let activities = ['badminton', 'computer games', 'eating'];
+        // --- kvdb.io Configuration ---
+        const KVDB_KEY = '5QAmdusS56oQyfoeEe9LVD';
+        const KVDB_BUCKET = 'global-activity-tracker'; // A unique name for the data
+        const KVDB_URL = `https://kvdb.io/${KVDB_KEY}/${KVDB_BUCKET}`;
+
+        // --- Global State Variables ---
+        let activities = ['badminton', 'computer games', 'eating']; // Default activities
         let currentActivity = null;
         let activityStartTime = null;
         let timeHistory = {};
-        
-        // Load saved data from localStorage
-        function loadSavedData() {
-            const savedActivity = localStorage.getItem('currentActivity');
-            const savedStartTime = localStorage.getItem('activityStartTime');
-            const savedTimeHistory = localStorage.getItem('timeHistory');
-            
-            if (savedTimeHistory) {
-                timeHistory = JSON.parse(savedTimeHistory);
-                updateTimeHistoryDisplay();
-            }
-            
-            if (savedActivity && savedStartTime) {
-                currentActivity = savedActivity;
-                activityStartTime = parseInt(savedStartTime);
-                
-                // Select the button
-                const activityButtons = document.querySelectorAll('.activity-button');
-                activityButtons.forEach(button => {
-                    if (button.dataset.activity === currentActivity) {
-                        button.classList.add('selected');
-                    }
-                });
+
+        // --- Data Persistence Functions ---
+
+        /**
+         * Loads the entire tracker state from kvdb.io
+         * @returns {Promise<object|null>} The saved data object or null if not found/error.
+         */
+        async function loadDataFromKVDB() {
+            try {
+                const response = await fetch(KVDB_URL);
+                if (response.status === 404) {
+                    console.log('No data found in KVDB. Starting with defaults.');
+                    return null;
+                }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Failed to load data from KVDB:', error);
+                document.getElementById('history-content').textContent = 'Error loading data.';
+                return null;
             }
         }
-        
-        // Update the time history display
+
+        /**
+         * Saves the entire tracker state to kvdb.io
+         * @returns {Promise<void>}
+         */
+        async function saveDataToKVDB() {
+            const dataToSave = {activities, currentActivity, activityStartTime, timeHistory};
+            try {
+                await fetch(KVDB_URL, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(dataToSave),
+                });
+            } catch (error) {
+                console.error('Failed to save data to KVDB:', error);
+            }
+        }
+
+        // --- UI Update Functions ---
+
+        /**
+         * Re-renders all activity buttons based on the global 'activities' array
+         */
+        function renderActivityButtons() {
+            const activityOptions = document.getElementById('activity-options');
+            activityOptions.innerHTML = ''; // Clear existing buttons
+            activities.forEach(activityName => {
+                const newButton = document.createElement('div');
+                newButton.className = 'activity-button';
+                newButton.dataset.activity = activityName;
+                newButton.textContent = activityName.charAt(0).toUpperCase() + activityName.slice(1);
+                newButton.addEventListener('click', () => switchActivity(activityName));
+                activityOptions.appendChild(newButton);
+            });
+        }
+
+        /**
+         * Updates the selected state of the activity buttons.
+         */
+        function updateSelectedButtonUI() {
+            const activityButtons = document.querySelectorAll('.activity-button');
+            activityButtons.forEach(button => {
+                button.classList.toggle('selected', button.dataset.activity === currentActivity);
+            });
+        }
+
+        /**
+         * Updates the time history display on the page.
+         */
         function updateTimeHistoryDisplay() {
             const historyContent = document.getElementById('history-content');
-            
             if (Object.keys(timeHistory).length === 0) {
                 historyContent.textContent = 'No activities tracked yet.';
                 return;
             }
-            
             let historyHTML = '';
             for (const activity in timeHistory) {
-                const minutes = Math.round(timeHistory[activity] / 60000); // Convert ms to minutes
-                historyHTML += `<div><strong>${activity}:</strong> ${minutes} minutes</div>`;
+                const minutes = Math.round(timeHistory[activity] / 60000); // ms to minutes
+                const displayName = activity.charAt(0).toUpperCase() + activity.slice(1);
+                historyHTML += `<div><strong>${displayName}:</strong> ${minutes} minutes</div>`;
             }
-            
             historyContent.innerHTML = historyHTML;
         }
-        
-        // Switch to a new activity
-        function switchActivity(newActivity) {
-            // If there's a current activity, record the time spent
+
+        // --- Core Logic Functions ---
+
+        /**
+         * Handles switching from one activity to another.
+         * @param {string} newActivity - The activity to switch to.
+         */
+        async function switchActivity(newActivity) {
+            // Record time for the previous activity
             if (currentActivity && activityStartTime) {
                 const timeSpent = Date.now() - activityStartTime;
-                
-                if (!timeHistory[currentActivity]) {
-                    timeHistory[currentActivity] = 0;
-                }
-                
-                timeHistory[currentActivity] += timeSpent;
-                
-                // Save to localStorage
-                localStorage.setItem('timeHistory', JSON.stringify(timeHistory));
-                updateTimeHistoryDisplay();
+                timeHistory[currentActivity] = (timeHistory[currentActivity] || 0) + timeSpent;
             }
-            
-            // Update current activity
+
+            // Set the new activity and start time
             currentActivity = newActivity;
             activityStartTime = Date.now();
-            
-            // Save to localStorage
-            localStorage.setItem('currentActivity', currentActivity);
-            localStorage.setItem('activityStartTime', activityStartTime.toString());
-            
+
             // Update UI
-            const activityButtons = document.querySelectorAll('.activity-button');
-            activityButtons.forEach(button => {
-                if (button.dataset.activity === currentActivity) {
-                    button.classList.add('selected');
-                } else {
-                    button.classList.remove('selected');
-                }
-            });
+            updateSelectedButtonUI();
+            updateTimeHistoryDisplay();
+
+            // Save the new state to the server
+            await saveDataToKVDB();
         }
-        
-        // Add a new activity
-        function addNewActivity(activityName) {
-            if (!activityName || activities.includes(activityName.toLowerCase())) {
-                return;
+
+        /**
+         * Adds a new activity to the list.
+         * @param {string} activityName - The name of the new activity.
+         */
+        async function addNewActivity(activityName) {
+            if (!activityName) return;
+            const normalizedName = activityName.trim().toLowerCase();
+            if (normalizedName && !activities.includes(normalizedName)) {
+                activities.push(normalizedName);
+                renderActivityButtons(); // Re-render buttons to include the new one
+                await saveDataToKVDB(); // Save the updated list of activities
             }
-            
-            const normalizedName = activityName.toLowerCase();
-            activities.push(normalizedName);
-            
-            // Create new button
-            const activityOptions = document.getElementById('activity-options');
-            const newButton = document.createElement('div');
-            newButton.className = 'activity-button';
-            newButton.dataset.activity = normalizedName;
-            newButton.textContent = activityName;
-            
-            // Add event listener
-            newButton.addEventListener('click', function() {
-                switchActivity(normalizedName);
-            });
-            
-            activityOptions.appendChild(newButton);
-            
-            // Hide add activity form
+            // Reset and hide the input form
             document.getElementById('add-activity-container').classList.remove('visible');
             document.getElementById('new-activity-input').value = '';
         }
-        
-        // Download time history as JSON
+
+        /**
+         * Prepares and triggers a download of the time history as a JSON file.
+         */
         function downloadTimeHistory() {
-            // If there's a current activity, update the time spent
+            const historyForDownload = JSON.parse(JSON.stringify(timeHistory));
+
+            // Add the time for the currently running activity for an up-to-the-minute download
             if (currentActivity && activityStartTime) {
                 const timeSpent = Date.now() - activityStartTime;
-                
-                // Create a copy of the time history to avoid modifying the original
-                const historyForDownload = JSON.parse(JSON.stringify(timeHistory));
-                
-                if (!historyForDownload[currentActivity]) {
-                    historyForDownload[currentActivity] = 0;
-                }
-                
-                historyForDownload[currentActivity] += timeSpent;
-                
-                // Convert milliseconds to minutes for each activity
-                for (const activity in historyForDownload) {
-                    historyForDownload[activity] = Math.round(historyForDownload[activity] / 60000);
-                }
-                
-                // Create and download the JSON file
-                const dataStr = JSON.stringify(historyForDownload, null, 2);
-                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-                
-                const exportFileName = 'time_history_' + new Date().toISOString().slice(0, 10) + '.json';
-                
-                const linkElement = document.createElement('a');
-                linkElement.setAttribute('href', dataUri);
-                linkElement.setAttribute('download', exportFileName);
-                linkElement.click();
-            } else {
-                // If no activity is selected, just download the current time history
-                const historyForDownload = {};
-                
-                for (const activity in timeHistory) {
-                    historyForDownload[activity] = Math.round(timeHistory[activity] / 60000);
-                }
-                
-                const dataStr = JSON.stringify(historyForDownload, null, 2);
-                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-                
-                const exportFileName = 'time_history_' + new Date().toISOString().slice(0, 10) + '.json';
-                
-                const linkElement = document.createElement('a');
-                linkElement.setAttribute('href', dataUri);
-                linkElement.setAttribute('download', exportFileName);
-                linkElement.click();
+                historyForDownload[currentActivity] = (historyForDownload[currentActivity] || 0) + timeSpent;
             }
+
+            // Convert all times from milliseconds to minutes for the download file
+            for (const activity in historyForDownload) {
+                historyForDownload[activity] = Math.round(historyForDownload[activity] / 60000);
+            }
+
+            const dataStr = JSON.stringify(historyForDownload, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+            const exportFileName = `time_history_${new Date().toISOString().slice(0, 10)}.json`;
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileName);
+            linkElement.click();
         }
-        
-        // Initialize when the DOM is fully loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            // Load saved data
-            loadSavedData();
-            
-            // Add event listeners to activity buttons
-            const activityButtons = document.querySelectorAll('.activity-button');
-            activityButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    switchActivity(this.dataset.activity);
-                });
-            });
-            
-            // Add event listener to "Add New Activity" button
-            document.getElementById('add-activity-btn').addEventListener('click', function() {
+
+        // --- Initialization and Event Listeners ---
+
+        /**
+         * Main function to initialize the application.
+         */
+        async function initializeApp() {
+            const savedData = await loadDataFromKVDB();
+
+            if (savedData) {
+                activities = savedData.activities || activities;
+                timeHistory = savedData.timeHistory || {};
+                currentActivity = savedData.currentActivity || null;
+                activityStartTime = savedData.activityStartTime || null;
+            }
+
+            // Render UI based on loaded or default state
+            renderActivityButtons();
+            updateTimeHistoryDisplay();
+            updateSelectedButtonUI();
+
+            // --- Set up event listeners after initial render ---
+            document.getElementById('add-activity-btn').addEventListener('click', () => {
                 document.getElementById('add-activity-container').classList.toggle('visible');
             });
-            
-            // Add event listener to confirm adding new activity
-            document.getElementById('confirm-add-activity').addEventListener('click', function() {
-                const activityName = document.getElementById('new-activity-input').value.trim();
+
+            document.getElementById('confirm-add-activity').addEventListener('click', () => {
+                const activityName = document.getElementById('new-activity-input').value;
                 addNewActivity(activityName);
             });
-            
-            // Add event listener to input field for Enter key
-            document.getElementById('new-activity-input').addEventListener('keypress', function(e) {
+
+            document.getElementById('new-activity-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    const activityName = this.value.trim();
-                    addNewActivity(activityName);
+                    addNewActivity(e.target.value);
                 }
             });
-            
-            // Add event listener to download JSON button
+
             document.getElementById('download-json-btn').addEventListener('click', downloadTimeHistory);
-            
-            // Add event listener for page unload to record final time
-            window.addEventListener('beforeunload', function() {
-                if (currentActivity && activityStartTime) {
-                    const timeSpent = Date.now() - activityStartTime;
-                    
-                    if (!timeHistory[currentActivity]) {
-                        timeHistory[currentActivity] = 0;
-                    }
-                    
-                    timeHistory[currentActivity] += timeSpent;
-                    
-                    // Update start time to now
-                    activityStartTime = Date.now();
-                    
-                    // Save to localStorage
-                    localStorage.setItem('timeHistory', JSON.stringify(timeHistory));
-                    localStorage.setItem('activityStartTime', activityStartTime.toString());
-                }
-            });
+        }
+
+        // Run the app when the page is loaded
+        document.addEventListener('DOMContentLoaded', initializeApp);
+
+        // Save final data when the user closes the tab/browser
+        window.addEventListener('beforeunload', () => {
+            if (currentActivity && activityStartTime) {
+                const timeSpent = Date.now() - activityStartTime;
+                timeHistory[currentActivity] = (timeHistory[currentActivity] || 0) + timeSpent;
+                // Update start time to now to prevent double-counting on quick reloads
+                activityStartTime = Date.now();
+            }
+
+            const dataToSave = {activities, currentActivity, activityStartTime, timeHistory};
+            const blob = new Blob([JSON.stringify(dataToSave)], {type: 'application/json'});
+
+            // Use sendBeacon for reliable data saving on page exit
+            navigator.sendBeacon(KVDB_URL, blob);
         });
     </script>
 </body>
