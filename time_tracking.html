@@ -4,108 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hello Website - Time Tracking</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            flex-direction: column;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            color: #333;
-            font-size: 2.5rem;
-            margin-bottom: 20px;
-        }
-        .container {
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            width: 80%;
-            max-width: 600px;
-        }
-        .activity-options {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .activity-button {
-            padding: 10px 15px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            background-color: white;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .activity-button.selected {
-            background-color: #4CAF50;
-            color: white;
-            border-color: #4CAF50;
-        }
-        .controls {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-        }
-        button {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 5px;
-            background-color: #0066cc;
-            color: white;
-            cursor: pointer;
-            font-size: 1rem;
-        }
-        button:hover {
-            background-color: #0055aa;
-        }
-        .add-activity-container {
-            margin-top: 20px;
-            display: none;
-        }
-        .add-activity-container.visible {
-            display: block;
-        }
-        input {
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            width: 70%;
-        }
-        .navigation {
-            margin-top: 30px;
-            display: flex;
-            gap: 20px;
-        }
-        a {
-            color: #0066cc;
-            text-decoration: none;
-            font-size: 1.2rem;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        .time-history {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-        }
-        .time-history h3 {
-            margin-top: 0;
-            color: #333;
-        }
-    </style>
+    <link rel="stylesheet" href="time_tracking_styles.css">
     <script src="script.js"></script>
 </head>
-<body>
+<body style="background-color: #8de6ea; justify-content: center ">
     <h1>Time Tracking</h1>
     
     <div class="container">
@@ -135,7 +37,7 @@
     <div class="navigation">
         <a href="index.html">Home</a>
         <a href="about.html">About</a>
-        <a href="snake.html">Snake Game</a>
+        <a href="Unused/snake.html">Snake Game</a>
     </div>
 
     <script>
@@ -181,7 +83,7 @@
             
             let historyHTML = '';
             for (const activity in timeHistory) {
-                const minutes = Math.round(timeHistory[activity] / 60000); // Convert ms to minutes
+                const minutes = Math.round(timeHistory[activity] / 60); // Convert ms to minutes
                 historyHTML += `<div><strong>${activity}:</strong> ${minutes} minutes</div>`;
             }
             
@@ -269,7 +171,7 @@
                 
                 // Convert milliseconds to minutes for each activity
                 for (const activity in historyForDownload) {
-                    historyForDownload[activity] = Math.round(historyForDownload[activity] / 60000);
+                    historyForDownload[activity] = Math.round(historyForDownload[activity] / 60);
                 }
                 
                 // Create and download the JSON file
@@ -287,7 +189,7 @@
                 const historyForDownload = {};
                 
                 for (const activity in timeHistory) {
-                    historyForDownload[activity] = Math.round(timeHistory[activity] / 60000);
+                    historyForDownload[activity] = Math.round(timeHistory[activity] / 1000);
                 }
                 
                 const dataStr = JSON.stringify(historyForDownload, null, 2);

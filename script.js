@@ -29,8 +29,8 @@ function showCurrentDate() {
     dateElement.id = 'current-date';
     
     const options = { 
-        weekday: 'long', 
-        year: 'numeric', 
+        weekday: 'short',
+        year: 'numeric',
         month: 'long', 
         day: 'numeric' 
     };
