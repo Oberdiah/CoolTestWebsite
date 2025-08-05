@@ -25,24 +25,6 @@ async function loadDataFromKVDB() {
     }
 }
 
-async function saveDataToKVDB() {
-    const dataToSave = {currentActivity, activityStartTime, timeHistory};
-    try {
-        await fetch(KVDB_URL, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(dataToSave),
-        });
-    } catch (error) {
-        console.error('Failed to save data to KVDB:', error);
-    }
-}
-
-// --- UI Update Functions ---
-
-/**
- * Re-renders all activity buttons based on the global 'activities' array
- */
 function renderActivityButtons() {
     const activityOptions = document.getElementById('activity-options');
     activityOptions.innerHTML = ''; // Clear existing buttons
@@ -56,9 +38,6 @@ function renderActivityButtons() {
     });
 }
 
-/**
- * Updates the selected state of the activity buttons.
- */
 function updateSelectedButtonUI() {
     const activityButtons = document.querySelectorAll('.activity-button');
     activityButtons.forEach(button => {
@@ -66,9 +45,6 @@ function updateSelectedButtonUI() {
     });
 }
 
-/**
- * Updates the time history display on the page.
- */
 function updateTimeHistoryDisplay() {
     const historyContent = document.getElementById('history-content');
     let historyHTML = '';
@@ -80,12 +56,6 @@ function updateTimeHistoryDisplay() {
     historyContent.innerHTML = historyHTML;
 }
 
-// --- Core Logic Functions ---
-
-/**
- * Handles switching from one activity to another.
- * @param {string} newActivity - The activity to switch to.
- */
 async function switchActivity(newActivity) {
     // Record time for the previous activity
     if (currentActivity && activityStartTime) {
@@ -102,7 +72,7 @@ async function switchActivity(newActivity) {
     updateTimeHistoryDisplay();
 
     // Save the new state to the server
-    await saveDataToKVDB();
+    saveData();
 }
 
 /**
@@ -115,40 +85,10 @@ async function addNewActivity(activityName) {
     if (normalizedName) {
         timeHistory[normalizedName] = 0;
         renderActivityButtons(); // Re-render buttons to include the new one
-        await saveDataToKVDB(); // Save the updated list of activities
     }
-    // Reset and hide the input form
-    document.getElementById('add-activity-container').classList.remove('visible');
     document.getElementById('new-activity-input').value = '';
+    saveData();
 }
-
-/**
- * Prepares and triggers a download of the time history as a JSON file.
- */
-function downloadTimeHistory() {
-    const historyForDownload = JSON.parse(JSON.stringify(timeHistory));
-
-    // Add the time for the currently running activity for an up-to-the-minute download
-    if (currentActivity && activityStartTime) {
-        const timeSpent = Date.now() - activityStartTime;
-        historyForDownload[currentActivity] = (historyForDownload[currentActivity] || 0) + timeSpent;
-    }
-
-    for (const activity in historyForDownload) {
-        historyForDownload[activity] = Math.round(historyForDownload[activity] / 1000);
-    }
-
-    const dataStr = JSON.stringify(historyForDownload, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-    const exportFileName = `time_history_${new Date().toISOString().slice(0, 10)}.json`;
-
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileName);
-    linkElement.click();
-}
-
-// --- Initialization and Event Listeners ---
 function renderGraph(){
     const chart = document.getElementById("chart");
     const values = Object.keys(timeHistory).map((activityName) => timeHistory[activityName] / 1000);
@@ -169,9 +109,6 @@ function renderGraph(){
 
 }
 
-/**
- * Main function to initialize the application.
- */
 async function initializeApp() {
 
     const savedData = await loadDataFromKVDB();
@@ -211,22 +148,18 @@ async function initializeApp() {
 
     document.getElementById('download-json-btn').addEventListener('click', downloadTimeHistory);
 }
+async function saveData() {
+    const dataToSave = {currentActivity, activityStartTime, timeHistory};
+    try {
+        await fetch(KVDB_URL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(dataToSave),
+        });
+    } catch (error) {
+        console.error('Failed to save data to KVDB:', error);
+    }
+}
 
 // Run the app when the page is loaded
 document.addEventListener('DOMContentLoaded', initializeApp);
-
-// Save final data when the user closes the tab/browser
-window.addEventListener('beforeunload', () => {
-    if (currentActivity && activityStartTime) {
-        const timeSpent = Date.now() - activityStartTime;
-        timeHistory[currentActivity] = (timeHistory[currentActivity] || 0) + timeSpent;
-        // Update start time to now to prevent double-counting on quick reloads
-        activityStartTime = Date.now();
-    }
-
-    const dataToSave = {currentActivity, activityStartTime, timeHistory};
-    const blob = new Blob([JSON.stringify(dataToSave)], {type: 'application/json'});
-
-    // Use sendBeacon for reliable data saving on page exit
-    navigator.sendBeacon(KVDB_URL, blob);
-});
