@@ -6,6 +6,7 @@ const KVDB_URL = `https://kvdb.io/${KVDB_KEY}/${KVDB_BUCKET}`;
 let currentActivity = null;
 let activityStartTime = null;
 let timeHistory = {};
+let myChart = null;
 
 async function loadDataFromKVDB() {
     try {
@@ -70,6 +71,7 @@ async function switchActivity(newActivity) {
     // Update UI
     updateSelectedButtonUI();
     updateTimeHistoryDisplay();
+    renderGraph();
 
     // Save the new state to the server
     // saveData();
@@ -85,27 +87,32 @@ async function addNewActivity(activityName) {
     if (normalizedName) {
         timeHistory[normalizedName] = 0;
         renderActivityButtons(); // Re-render buttons to include the new one
+        renderGraph()
     }
     document.getElementById('new-activity-input').value = '';
     // saveData();
 }
 function renderGraph(){
-    const chart = document.getElementById("chart");
-    const values = Object.keys(timeHistory).map((activityName) => timeHistory[activityName] / 1000);
+    if(myChart === null){
+        const chart = document.getElementById("chart");
+        myChart = new Chart(chart, {
+            type: "bar",
+            data: {
+                labels: ['mylabel'],
+                datasets: [
+                    {
+                        label: "Time spent",
+                        data: [6],
+                        borderWidth: 1,
+                    },
+                ],
+            },
+        });
+    }
+    myChart.data.labels = Object.keys(timeHistory);
+    myChart.data.datasets[0].data = Object.keys(timeHistory).map((activityName) => timeHistory[activityName] / 1000);
+    myChart.update();
 
-    new Chart(chart, {
-        type: "bar",
-        data: {
-            labels: Object.keys(timeHistory),
-            datasets: [
-                {
-                    label: "Time spent",
-                    data: values,
-                    borderWidth: 1,
-                },
-            ],
-        },
-    });
 
 }
 
@@ -133,7 +140,7 @@ async function initializeApp() {
         delete timeHistory[currentActivity]
         currentActivity = null;
         renderActivityButtons();
-        // saveData();
+        renderGraph()
     });
 
     document.getElementById('confirm-add-activity').addEventListener('click', () => {
@@ -159,23 +166,8 @@ function saveData() {
     } catch (error) {
         console.error('Failed to save data to KVDB:', error);
     }
-    var thing = 6;
 }
 
 // Run the app when the page is loaded
 document.addEventListener('DOMContentLoaded', initializeApp);
 window.addEventListener('beforeunload', saveData);
-// window.addEventListener('beforeunload', () => {
-//     if (currentActivity && activityStartTime) {
-//         const timeSpent = Date.now() - activityStartTime;
-//         timeHistory[currentActivity] = (timeHistory[currentActivity] || 0) + timeSpent;
-//         // Update start time to now to prevent double-counting on quick reloads
-//         activityStartTime = Date.now();
-//     }
-//
-//     const dataToSave = {currentActivity, activityStartTime, timeHistory};
-//     const blob = new Blob([JSON.stringify(dataToSave)], {type: 'application/json'});
-//
-//     // Use sendBeacon for reliable data saving on page exit
-//     navigator.sendBeacon(KVDB_URL, blob);
-// });
