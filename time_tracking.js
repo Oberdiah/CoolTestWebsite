@@ -72,7 +72,7 @@ async function switchActivity(newActivity) {
     updateTimeHistoryDisplay();
 
     // Save the new state to the server
-    saveData();
+    // saveData();
 }
 
 /**
@@ -87,7 +87,7 @@ async function addNewActivity(activityName) {
         renderActivityButtons(); // Re-render buttons to include the new one
     }
     document.getElementById('new-activity-input').value = '';
-    saveData();
+    // saveData();
 }
 function renderGraph(){
     const chart = document.getElementById("chart");
@@ -133,6 +133,7 @@ async function initializeApp() {
         delete timeHistory[currentActivity]
         currentActivity = null;
         renderActivityButtons();
+        // saveData();
     });
 
     document.getElementById('confirm-add-activity').addEventListener('click', () => {
@@ -145,21 +146,36 @@ async function initializeApp() {
             addNewActivity(e.target.value);
         }
     });
-
-    document.getElementById('download-json-btn').addEventListener('click', downloadTimeHistory);
 }
-async function saveData() {
+function saveData() {
     const dataToSave = {currentActivity, activityStartTime, timeHistory};
     try {
-        await fetch(KVDB_URL, {
+        fetch(KVDB_URL, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(dataToSave),
+            keepalive: true
         });
     } catch (error) {
         console.error('Failed to save data to KVDB:', error);
     }
+    var thing = 6;
 }
 
 // Run the app when the page is loaded
 document.addEventListener('DOMContentLoaded', initializeApp);
+window.addEventListener('beforeunload', saveData);
+// window.addEventListener('beforeunload', () => {
+//     if (currentActivity && activityStartTime) {
+//         const timeSpent = Date.now() - activityStartTime;
+//         timeHistory[currentActivity] = (timeHistory[currentActivity] || 0) + timeSpent;
+//         // Update start time to now to prevent double-counting on quick reloads
+//         activityStartTime = Date.now();
+//     }
+//
+//     const dataToSave = {currentActivity, activityStartTime, timeHistory};
+//     const blob = new Blob([JSON.stringify(dataToSave)], {type: 'application/json'});
+//
+//     // Use sendBeacon for reliable data saving on page exit
+//     navigator.sendBeacon(KVDB_URL, blob);
+// });
